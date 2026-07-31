@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CipherPad — Encrypted Journal</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex; justify-content: center; padding: 30px 15px; min-height: 100vh;
+        }
+        .container { width: 100%; max-width: 750px; }
+        h1 { text-align: center; font-size: 2rem; color: #58a6ff; margin-bottom: 5px; letter-spacing: 3px; }
+        .subtitle { text-align: center; color: #8b949e; font-size: 0.8rem; margin-bottom: 25px; }
+
+        .lock-screen {
+            background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+            padding: 40px; text-align: center; max-width: 400px; margin: 50px auto;
+        }
+        .lock-screen h2 { color: #58a6ff; margin-bottom: 20px; }
+        .lock-screen input {
+            width: 100%; padding: 12px; margin-bottom: 15px; background: #0d1117;
+            border: 1px solid #30363d; border-radius: 8px; color: #c9d1d9;
+            font-size: 1rem; text-align: center;
+        }
+        .lock-error { color: #f85149; font-size: 0.85rem; margin-top: 10px; display: none; }
+
+        .journal-area { display: none; }
+        .toolbar {
+            display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;
+        }
+        button {
+            padding: 10px 20px; border: 1px solid #30363d; border-radius: 6px;
+            cursor: pointer; font-size: 0.85rem; transition: all 0.2s;
+        }
+        .btn-primary { background: #238636; color: white; border-color: #238636; }
+        .btn-primary:hover { background: #2ea043; }
+        .btn-outline { background: transparent; color: #c9d1d9; }
+        .btn-outline:hover { background: #1f2937; }
+        .btn-danger { background: transparent; color: #f85149; border-color: #f85149; }
+        .btn-danger:hover { background: #f8514922; }
+        .btn-small { padding: 5px 12px; font-size: 0.75rem; }
+        .btn-warn { background: transparent; color: #d2991d; border-color: #d2991d; }
+        .btn-warn:hover { background: #d2991d22; }
+
+        .entry-card {
+            background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+            padding: 15px; margin-bottom: 15px;
+        }
+        .entry-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 5px; }
+        .entry-date { color: #8b949e; font-size: 0.8rem; }
+        .entry-mood { font-size: 1.2rem; }
+        .entry-body { color: #c9d1d9; white-space: pre-wrap; margin-bottom: 10px; line-height: 1.6; }
+        .entry-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+        .tag { background: #1f2937; color: #58a6ff; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; }
+        .entry-actions { display: flex; gap: 8px; }
+
+        .form-card {
+            background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+            padding: 15px; margin-bottom: 20px; display: none;
+        }
+        input, textarea, select {
+            width: 100%; padding: 10px; margin-bottom: 10px; background: #0d1117;
+            border: 1px solid #30363d; border-radius: 6px; color: #c9d1d9;
+            font-size: 0.9rem;
+        }
+        textarea { resize: vertical; min-height: 200px; font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; }
+        .row { display: flex; gap: 10px; }
+        .row input, .row select { flex: 1; }
+        .empty { text-align: center; color: #8b949e; padding: 40px; }
+
+        .search-bar { margin-bottom: 15px; }
+        .status-bar { display: flex; justify-content: space-between; align-items: center; color: #8b949e; font-size: 0.75rem; margin-bottom: 15px; }
+        .status-bar span { cursor: pointer; }
+        .status-bar span:hover { color: #58a6ff; }
+
+        .toast {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #238636; color: white; padding: 10px 20px; border-radius: 8px;
+            font-size: 0.9rem; opacity: 0; transition: opacity 0.3s; z-index: 1000;
+        }
+        .toast.show { opacity: 1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CipherPad</h1>
+        <div class="subtitle">Encrypted Journal • Your Words, Locked Safe</div>
+
+        <!-- Lock Screen -->
+        <div class="lock-screen" id="lockScreen">
+            <h2>🔐 Unlock Your Journal</h2>
+            <p style="color:#8b949e; margin-bottom:20px; font-size:0.9rem">Enter your password to access your entries.</p>
+            <input type="password" id="passwordInput" placeholder="Enter password..." onkeydown="if(event.key==='Enter') unlock()">
+            <button class="btn-primary" onclick="unlock()">Unlock</button>
+            <div class="lock-error" id="lockError">Wrong password. Try again.</div>
+            <p style="color:#8b949e; margin-top:20px; font-size:0.8rem">
+                First time? Your password will create a new encrypted journal.<br>
+                <strong>⚠️ If you forget your password, your entries cannot be recovered.</strong>
+            </p>
+        </div>
+
+        <!-- Journal Area -->
+        <div class="journal-area" id="journalArea">
+            <div class="status-bar">
+                <span>🔒 Encrypted & Locked</span>
+                <span onclick="lock()">🔐 Lock Journal</span>
+            </div>
+
+            <!-- Entry Form -->
+            <div class="form-card" id="formCard">
+                <input type="text" id="entryTitle" placeholder="Title (optional)">
+                <div class="row">
+                    <select id="entryMood">
+                        <option value="">Mood (optional)</option>
+                        <option>😊 Happy</option><option>😢 Sad</option><option>😠 Angry</option>
+                        <option>😰 Anxious</option><option>😴 Tired</option><option>💪 Motivated</option>
+                        <option>🤔 Thoughtful</option><option>❤️ Grateful</option>
+                    </select>
+                    <input type="text" id="entryTags" placeholder="Tags: personal, ideas, work">
+                </div>
+                <textarea id="entryBody" placeholder="Dear Journal..."></textarea>
+                <div style="display:flex; gap:10px">
+                    <button class="btn-primary" onclick="saveEntry()">Save Entry</button>
+                    <button class="btn-outline" onclick="cancelEdit()">Cancel</button>
+                </div>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <button class="btn-primary" onclick="showForm()">+ New Entry</button>
+                <button class="btn-outline" onclick="exportJournal()">Export</button>
+                <button class="btn-outline" onclick="document.getElementById('importFile').click()">Import</button>
+                <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJournal(event)">
+                <button class="btn-danger" onclick="clearJournal()">Clear All</button>
+            </div>
+
+            <input class="search-bar" type="text" id="searchInput" placeholder="Search entries..." oninput="renderEntries()">
+
+            <div id="entryList"></div>
+        </div>
+
+        <div id="toast" class="toast"></div>
+    </div>
+
+    <script>
+        let password = null;
+        let derivedKey = null;
+        let entries = [];
+        let editingId = null;
+
+        // ========== ENCRYPTION ==========
+        async function deriveKey(pw) {
+            const enc = new TextEncoder();
+            const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveKey']);
+            return crypto.subtle.deriveKey(
+                { name: 'PBKDF2', salt: enc.encode('cipherpad-salt'), iterations: 100000, hash: 'SHA-256' },
+                keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+            );
+        }
+
+        async function encrypt(text, key) {
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const enc = new TextEncoder();
+            const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(text));
+            const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+            combined.set(iv); combined.set(new Uint8Array(ciphertext), iv.length);
+            return btoa(String.fromCharCode(...combined));
+        }
+
+        async function decrypt(encryptedB64, key) {
+            try {
+                const combined = Uint8Array.from(atob(encryptedB64), c => c.charCodeAt(0));
+                const iv = combined.slice(0, 12);
+                const ciphertext = combined.slice(12);
+                const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+                return new TextDecoder().decode(decrypted);
+            } catch { return null; }
+        }
+
+        // ========== LOCK / UNLOCK ==========
+        async function unlock() {
+            const pw = document.getElementById('passwordInput').value;
+            if (!pw) return;
+            try {
+                const key = await deriveKey(pw);
+                const stored = localStorage.getItem('cipherpad_data');
+                if (stored) {
+                    const decrypted = await decrypt(stored, key);
+                    if (decrypted === null) { document.getElementById('lockError').style.display = 'block'; return; }
+                    entries = JSON.parse(decrypted);
+                } else {
+                    entries = [];
+                }
+                password = pw;
+                derivedKey = key;
+                document.getElementById('lockScreen').style.display = 'none';
+                document.getElementById('journalArea').style.display = 'block';
+                document.getElementById('lockError').style.display = 'none';
+                renderEntries();
+            } catch { document.getElementById('lockError').style.display = 'block'; }
+        }
+
+        async function lock() {
+            await saveToStorage();
+            password = null; derivedKey = null; entries = [];
+            document.getElementById('lockScreen').style.display = 'block';
+            document.getElementById('journalArea').style.display = 'none';
+            document.getElementById('passwordInput').value = '';
+        }
+
+        async function saveToStorage() {
+            if (!derivedKey) return;
+            const plaintext = JSON.stringify(entries);
+            const encrypted = await encrypt(plaintext, derivedKey);
+            localStorage.setItem('cipherpad_data', encrypted);
+        }
+
+        // ========== ENTRIES ==========
+        function showForm(id = null) {
+            document.getElementById('formCard').style.display = 'block';
+            if (id !== null) {
+                const e = entries.find(e => e.id === id);
+                if (!e) return;
+                document.getElementById('entryTitle').value = e.title;
+                document.getElementById('entryMood').value = e.mood;
+                document.getElementById('entryTags').value = e.tags.join(', ');
+                document.getElementById('entryBody').value = e.body;
+                editingId = id;
+            } else {
+                editingId = null;
+                document.getElementById('entryTitle').value = '';
+                document.getElementById('entryMood').value = '';
+                document.getElementById('entryTags').value = '';
+                document.getElementById('entryBody').value = '';
+            }
+        }
+
+        function cancelEdit() { document.getElementById('formCard').style.display = 'none'; editingId = null; }
+
+        async function saveEntry() {
+            const title = document.getElementById('entryTitle').value.trim();
+            const mood = document.getElementById('entryMood').value;
+            const tags = document.getElementById('entryTags').value.split(',').map(t => t.trim()).filter(Boolean);
+            const body = document.getElementById('entryBody').value.trim();
+            if (!body) return toast('Please write something.');
+
+            if (editingId !== null) {
+                const e = entries.find(e => e.id === editingId);
+                if (e) { e.title = title; e.mood = mood; e.tags = tags; e.body = body; e.updated = Date.now(); }
+            } else {
+                entries.push({ id: Date.now(), title, mood, tags, body, created: Date.now(), updated: Date.now() });
+            }
+            await saveToStorage();
+            renderEntries();
+            cancelEdit();
+            toast('Entry saved.');
+        }
+
+        async function deleteEntry(id) {
+            entries = entries.filter(e => e.id !== id);
+            await saveToStorage();
+            renderEntries();
+            toast('Entry deleted.');
+        }
+
+        async function clearJournal() {
+            if (confirm('Delete ALL journal entries? This cannot be undone.')) {
+                entries = [];
+                await saveToStorage();
+                renderEntries();
+                toast('Journal cleared.');
+            }
+        }
+
+        async function exportJournal() {
+            const blob = new Blob([JSON.stringify(entries, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = 'cipherpad-export.json'; a.click();
+        }
+
+        async function importJournal(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async () => {
+                try {
+                    const imported = JSON.parse(reader.result);
+                    if (Array.isArray(imported)) {
+                        entries = [...entries, ...imported];
+                        await saveToStorage();
+                        renderEntries();
+                        toast('Imported!');
+                    }
+                } catch { toast('Invalid file.'); }
+            };
+            reader.readAsText(file); e.target.value = '';
+        }
+
+        function renderEntries() {
+            const list = document.getElementById('entryList');
+            const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
+            const filtered = entries
+                .filter(e => !q || e.title.toLowerCase().includes(q) || e.body.toLowerCase().includes(q) ||
+                    e.tags.some(t => t.toLowerCase().includes(q)))
+                .sort((a, b) => b.updated - a.updated);
+
+            if (!filtered.length) {
+                list.innerHTML = '<div class="empty">No entries yet. Click "+ New Entry" to start writing.</div>';
+                return;
+            }
+            list.innerHTML = filtered.map(e => `
+                <div class="entry-card">
+                    <div class="entry-header">
+                        <span style="color:#58a6ff;font-weight:600">${e.title || 'Untitled Entry'}</span>
+                        <span class="entry-date">${new Date(e.updated).toLocaleString()}</span>
+                        ${e.mood ? `<span class="entry-mood">${e.mood.split(' ')[0]}</span>` : ''}
+                    </div>
+                    <div class="entry-body">${esc(e.body.substring(0, 500))}${e.body.length > 500 ? '...' : ''}</div>
+                    ${e.tags.length ? `<div class="entry-tags">${e.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
+                    <div class="entry-actions">
+                        <button class="btn-outline btn-small" onclick="showForm(${e.id})">Edit</button>
+                        <button class="btn-danger btn-small" onclick="deleteEntry(${e.id})">Delete</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        function esc(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+        function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); }
+    </script>
+</body>
+  </html>
